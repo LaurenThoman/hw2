@@ -9,6 +9,8 @@
 #include "db_parser.h"
 #include "product_parser.h"
 #include "util.h"
+#include "datastore.h"
+#include "mydatastore.h"
 
 using namespace std;
 struct ProdNameSorter {
@@ -29,7 +31,7 @@ int main(int argc, char* argv[])
      * Declare your derived DataStore object here replacing
      *  DataStore type to your derived type
      ****************/
-    DataStore ds;
+    MyDataStore ds;
 
 
 
@@ -62,6 +64,7 @@ int main(int argc, char* argv[])
     cout << "====================================" << endl;
 
     vector<Product*> hits;
+    map<string, vector<Product*>> carts; //  added
     bool done = false;
     while(!done) {
         cout << "\nEnter command: " << endl;
@@ -90,6 +93,64 @@ int main(int argc, char* argv[])
                 hits = ds.search(terms, 1);
                 displayProducts(hits);
             }
+            else if (cmd == "ADD") {
+                string username;
+                int hit_result_index;
+                ss >> username >> hit_result_index;
+
+                //  checksif user exists
+                User* user = ds.getUser(username);
+                if (user == nullptr || hit_result_index < 1 || hit_result_index > (int)hits.size()) {
+                    cout << "Invalid request\n";
+                    continue;
+                }
+                carts[username].push_back(hits[hit_result_index - 1]);
+            }
+      /* Add support for other commands here */
+            else if (cmd == "VIEWCART") {
+                string username;
+                ss >> username;
+
+                // checksif user exists
+                if (ds.getUser(username) == nullptr) {
+                    cout << "Invalid username\n";
+                    continue;
+                }
+
+                //  display cart
+                if (carts[username].size()) {
+                    int resultNo = 1;
+                    for (vector<Product*>::iterator it = carts[username].begin(); it != carts[username].end(); ++it) {
+                        cout << "Hit " << setw(3) << resultNo << endl;
+                        cout << (*it)->displayString() << endl;
+                        cout << endl;
+                        resultNo++;
+                    }
+                }
+            }
+            else if (cmd == "BUYCART") {
+                string username;
+                ss >> username;
+
+                // checksif user exists
+                User* user = ds.getUser(username);
+                if (user == nullptr) {
+                    cout << "Invalid username\n";
+                    continue;
+                }
+
+                // process cart
+                vector<Product*> newCart;
+                for (Product* p : carts[username]) {
+                    if (user->getBalance() >= p->getPrice() && p->getQty() > 0) {
+                        user->deductAmount(p->getPrice());
+                        p->subtractQty(1);
+                    } else {
+                        newCart.push_back(p);
+                    }
+                }
+                carts[username] = newCart;
+            }
             else if ( cmd == "QUIT") {
                 string filename;
                 if(ss >> filename) {
@@ -99,9 +160,6 @@ int main(int argc, char* argv[])
                 }
                 done = true;
             }
-	    /* Add support for other commands here */
-
-
 
 
             else {
